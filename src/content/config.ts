@@ -1,4 +1,4 @@
-import { defineCollection, z } from "astro:content";
+import {defineCollection, getCollection, z} from "astro:content";
 
 const postsCollection = defineCollection({
   type: "content",
@@ -12,3 +12,18 @@ const postsCollection = defineCollection({
 });
 
 export const collections = { posts: postsCollection };
+
+export const getPosts = async () => {
+  const posts = [];
+  try {
+    const postsFromApi = await getCollection("posts");
+    posts.push(...postsFromApi);
+    return posts.sort(function (first, second) {
+      // @ts-ignore
+      return second.data.publishedAt.getTime() - first.data.publishedAt.getTime();
+    });
+  } catch (e) {
+    console.error(e);
+  }
+  return posts;
+}
