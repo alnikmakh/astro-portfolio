@@ -1,3 +1,4 @@
+// FIXME: eslint doesn't work properly in this template
 module.exports = {
   extends: ["plugin:astro/recommended"],
   overrides: [
