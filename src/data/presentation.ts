@@ -16,7 +16,7 @@ const presentation: Presentation = {
   title: "Hi, I’m Alexander 👋",
   // profile: "/profile.webp",
   description:
-    "Hi, i'm a *frontend developer* with almost *4 years* of web experience. I am currently working with *NestJS, React and Typescript*.",
+    "Hi, i'm a *frontend developer* with *4 years* of web experience. I am currently working with *NestJS, React and Typescript*.",
   socials: [
     {
       label: "Github",
