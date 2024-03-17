@@ -14,9 +14,9 @@ type Presentation = {
 const presentation: Presentation = {
   mail: "regulardev.click@gmail.com",
   title: "Hi, I’m Alexander 👋",
-  // profile: "/profile.webp",
+  profile: "/profile.webp",
   description:
-    "Hi, i'm a *frontend developer* with *4 years* of web experience. I am currently working with *NestJS, React and Typescript*.",
+    "I'm a *frontend developer* with *4 years* of web experience. I am currently working with *NestJS, React and Typescript*.",
   socials: [
     {
       label: "Github",
