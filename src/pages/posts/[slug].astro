@@ -1,5 +1,6 @@
 ---
 import { CollectionEntry, getCollection } from "astro:content";
+import { Image } from 'astro:assets';
 import Layout from "@/layouts/Layout.astro";
 import formatDate from "@/utils/formatDate";
 
@@ -22,11 +23,15 @@ const { Content } = await post.render();
 
 <Layout title={post.data.title} description={post.data.description}>
   <main class="post flex w-full flex-col gap-4">
-    <header role="presentation">
-      <h1 class="text-md">
-        {post.data.title} - {formatDate(post.data.publishedAt)}
+    <header role="presentation" class="pb-3">
+      <h1 class="text-5xl pb-3 font-bold">
+        {post.data.title}
       </h1>
-      <p class="italic">{post.data.description}</p>
+      <p class="text-sm pb-5">{formatDate(post.data.publishedAt)}</p>
+      <figure class="flex flex-col items-center">
+        <Image src={post.data.image.source} class="w-2/3" alt="alt"/>
+        <figcaption class="text-xs pt-3">{post.data.image.link ? <a href={post.data.image.link}>{post.data.image.description}</a> : ''}</figcaption>
+      </figure>
     </header>
 
     <Content />
