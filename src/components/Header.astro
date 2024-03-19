@@ -4,9 +4,7 @@ import removeTrailingSlash from "@/utils/removeTrailingSlash";
 import presentation from "@/data/presentation";
 
 const pathname = removeTrailingSlash(Astro.url.pathname);
-const posts = (await getCollection("posts")).sort(function (first, second) {
-    return second.data.publishedAt.getTime() - first.data.publishedAt.getTime();
-    }).filter((item) => item.data.isPublish);
+const posts = (await getCollection("posts", (item) => item.data.isPublish));
 ---
 
 <header class="z-40 flex w-full flex-col gap-2 md:flex-row md:justify-between border-b-2">

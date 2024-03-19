@@ -1,0 +1,4 @@
+.emphasized {
+    @apply text-indigo-500;
+    @apply dark:text-orange-500;
+}
