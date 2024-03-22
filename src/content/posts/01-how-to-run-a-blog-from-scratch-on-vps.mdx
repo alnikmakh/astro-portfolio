@@ -1,0 +1,123 @@
+---
+title: How to run a blog on VPS from scratch using only the Docker
+publishedAt: 2024-03-22
+description: Run your project on bare VPS using only Docker
+isPublish: true
+image: { source: '/public/pexels-pixabay-276514.webp', description: 'Picture by Pixabay', link: 'https://pexels.com/@pixabay/' }
+---
+import Emphasized from '../../components/shared/emphasized/Emphasized.astro';
+export const components = {em: Emphasized};
+
+- [Configure VPS](#configure-vps)
+- [Install the Docker](#install-the-docker)
+- [Prepare your project](#prepare-your-project)
+- [Run it on VPS](#run-it-on-vps)
+
+In this post I want to share my experience of building my blog-experiment-lab-website on VPS from scratch. I've built it on bare VPS by using only docker in purpose to understand basic processes of running this type of projects. Hope this article could be useful for someone.
+
+## Configure VPS
+
+First things first you need a VPS :) Then if you want to connect to your project by domain name you need to buy it or you can use free one from your VPS provider. If you buy domain name you will need to point it to your VPS. Don't forget to open necessary ports and close other in Firewall and arrange basic security for example with fail2ban.
+
+After creating a VPS you will have root user credentials. It  is not recommended to operate or especially run your applications as root user, so we need to create new one. I created a default user by using this simple command as *root* user:
+
+```bash
+adduser username
+```
+
+In the command prompt you will need to answer several questions if you want or just leave them empty and that's it! You can check that user is created by this command:
+```bash
+grep '^username' /etc/passwd
+```
+
+## Install the Docker
+
+Second, you need to install the *Docker*.  There is explicit instructions how to achieve that on it's official page right [there](https://docs.docker.com/engine/install/ubuntu/). Don't forget to add new user to docker user group:
+```bash
+usermod -aG docker your_username
+```
+and run this command to reevaluate your group membership:
+```bash
+newgrp docker
+```
+
+## Prepare your project
+
+When all preparations is done you need your project. In my case it's Astro static website. The project should have Dockerfile in which you describe process of building docker image. It's mine:
+```yml
+# BUILD STAGE
+FROM node:lts-alpine as build  # use nodejs alpine image and assign it name "build" to use it in production stage
+WORKDIR /app  # create work directory
+COPY package*.json ./  # copy package.json and package-lock.json from project to work directory
+RUN npm install  # install dependencies
+COPY . .  # copy source code from project to work directory
+RUN npm run build  # build project
+
+# PRODUCTION STAGE
+FROM nginx:stable-alpine as production  # use nginx alpine image
+COPY --from=build /app/dist /usr/share/nginx/html  # using name of the image from previous stage copy bundle to nginx serving directory
+EXPOSE 80  # expose port 80 so you can connect to nginx outside the container
+CMD ["nginx", "-g", "daemon off;"]  # run nginx
+```
+
+Notice if for your project you use another package manager instead of npm you need to copy it's .lock file with additional COPY step in BUILD stage. Also you can learn why "daemon off" is crucial for this particular nginx image [there](https://github.com/blockloop/docker-alpine-nginx/blob/master/README.md#:~:text=Make%20sure%20you%20start%20nginx%20without%20daemon%20mode%2C%20by%20including%20daemon%20off%3B%20in%20your%20nginx%20configuration%2C%20otherwise%20the%20container%20will%20constantly%20exit%20right%20after%20nginx%20starts.)
+
+## Run it on VPS
+
+Then to run this project on VPS we need a docker-compose.yml file in which we describe configuration of whole scheme of docker containers to make it available outside of our VPS. In my case to run simple static Astro website I need three containers - reverse-proxy(another nginx container to handle incoming requests and proxy them to my project container), letsencrypt-companion(container to do all work with ssl certificates) and container that is built from my project's source code:
+```yml
+services:
+  nginx:
+    container_name: nginx
+    image: nginxproxy/nginx-proxy
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx/html:/usr/share/nginx/html
+      - ./nginx/certs:/etc/nginx/certs
+      - ./nginx/vhost:/etc/nginx/vhost.d
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  letsencrypt-companion:
+    container_name: letsencrypt-companion
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: unless-stopped
+    volumes_from:
+      - nginx
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./nginx/acme:/etc/acme.sh
+    env_file:
+      - email.env
+  frontend:
+    container_name: frontend
+    build: .
+    env_file:
+      - hosts.env
+```
+For this docker compose configuration to work properly you need to create in the same directory with docker-compose.yml files with names email.env:
+```bash
+DEFAULT_EMAIL=test@mail.com
+```
+and hosts.env:
+```bash
+VIRTUAL_HOST=example.com
+LETSENCRYPT_HOST=example.com
+```
+So my docker-compose.yml is a basic scheme to host your project on any VPS:
+![VPS containers scheme](../assets/vps-containers-scheme.webp)
+And from now on you just need to pull your project to your VPS from git repository, enter into project's directory on VPS and run command:
+```bash
+docker compose up -d
+```
+where ```-d{:bash}``` flag means "detached mode" so the process of a docker-compose runs in background without occupation of current terminal session.
+
+That's it! With this configuration you can move and deploy your project wherever the *docker* exists =)
+
+Next step is to automate build and deploy to VPS on push to particular branch in the repository.

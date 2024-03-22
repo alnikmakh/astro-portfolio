@@ -2,14 +2,6 @@
   @apply leading-7;
 }
 
-.post h2 {
-  @apply mt-6 text-3xl text-neutral-100;
-}
-
-.post h3 {
-  @apply mt-4 text-xl text-neutral-100;
-}
-
 .post span code {
   @apply px-1 py-[2px];
 }
@@ -27,9 +19,5 @@
 }
 
 .post pre {
-  @apply p-4;
+  @apply p-4 overflow-scroll;
 }
-
-/*.post pre > code {*/
-/*  @apply bg-transparent;*/
-/*}*/
