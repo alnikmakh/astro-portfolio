@@ -1,0 +1,166 @@
+---
+title: Automate deploy of your blog on VPS
+publishedAt: 2024-04-20
+description: Automate deploy of your blog on VPS
+isPublish: true
+image: { source: '/public/DALL-E-2024-04-20.webp', description: 'Picture by DALL-E' }
+---
+import Emphasized from '../../components/shared/emphasized/Emphasized.astro';
+export const components = {em: Emphasized};
+
+## Contents
+
+## Intro
+
+In the previous article we've built up setup for our project on VPS. But there is at least one inconvenience in this setup - every time you need to make changes in your project, you need to follow these steps:
+- commit and push changes to your GitHub repository
+- ssh to your VPS and pull changes from repository
+- run docker-compose to build and run your fresh new release
+
+You need to change environments and manually run docker commands on your VPS. It's pretty annoying and slow for example when you need to push hot fixes. So let's make our life easier and automate these steps of deploying the new version of your project to our 'production'.
+
+## Image to Registry
+
+First step from those mentioned above to skip is building and storing the docker image on our VPS. Instead, we will build and store it in remote registry automatically by using the power of GitHub Actions. GitHub Actions is a built-in GitHub feature to run pipelines for your project. To enable this feature we need to create following directory and a file in our project:
+
+```bash
+.github/workflows/docker-publish.yml
+```
+
+The content of this file would be something like that:
+
+```yml
+name: Create, publish and deploy
+
+# Configures this workflow to run every time a change is pushed to the branch called `main`.
+on:
+  push:
+    branches: ['main']
+
+# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.actor }}/astro-blog:latest
+
+# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip')"
+    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push Docker image
+        run: |
+          docker build . --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+```
+
+The steps in this YAML file has a self-speaking naming. Actually, this and next parts of YAML file I took from the same file for this website. I want to point out to a couple of things there. Take a look on a line:
+
+```yml
+if: "!contains(github.event.head_commit.message, 'ci skip')"
+```
+
+It allows you to skip this whole workflow, in case that you don't want to rebuild your project on this particular commit, by simply adding *'ci skip'* to your commit message.
+
+Second point is a step named *Log in to the Container registry*. You can use a predefined actions from marketplace for this step, for example [this one](https://github.com/marketplace/actions/docker-login). But to understand what is happening under the hood we have more verbose version.
+
+On this step to login to GitHub Container Registry (ghcr.io) we are using ``` secrets.GITHUB_TOKEN{:bash} ```. It's a token, that GitHub Actions generates for current pipeline, so you don't bother generating and renewing your Personal Access Token at least for this particular situation. You can use your Personal Access Token there too, but in my opinion GITHUB_TOKEN feature is far more convenient.
+
+## Deploy
+
+So, we've built our image and have it in registry, but we still need to manually pull it on our VPS and tell the docker to deploy new container. To automate this workflow we can tell GitHub Actions to actually log in to our VPS, pull our image from registry, deploy new containers and close session. This is an updated version of our ```docker-publish.yml{:bash}``` file, that I used to run this website:
+
+```yml
+name: Create, publish and deploy
+
+# Configures this workflow to run every time a change is pushed to the branch called `main`.
+on:
+  push:
+    branches: ['main']
+
+# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.actor }}/astro-blog:latest
+
+# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'ci skip')"
+    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to the Container registry
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and push Docker image
+        run: |
+          docker build . --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+  deploy:
+    needs: build-and-push-image
+    name: deploy image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: install ssh keys
+        # check this thread to understand why its needed:
+        # <https://stackoverflow.com/a/70447517>
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/gthb_ctn
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/gthb_ctn
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
+      - name: connect and pull
+        run: ssh -i ~/.ssh/gthb_ctn ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && docker compose pull && docker compose up -d && exit"
+      - name: cleanup
+        run: rm -rf ~/.ssh
+```
+
+As you can see I added new job named *deploy*, which needs completed job *build-and-push-image* to run.
+For this job to work properly you need to add several secrets to your repository:
+- *SSH_PRIVATE_KEY* - your PRIVATE part of ssh key for the user on your VPS
+- *SSH_USER* - username for user on your VPS on behalf on whom we will execute commands
+- *SSH_HOST* - address of your VPS
+- *WORK_DIR* - directory with docker-compose.yml to deploy our project
+We need to stop on SSH_PRIVATE_KEY for more details.
+
+### SSH Private Key
+
+There is important part of this particular job - GitHub Actions worker needs to login to your VPS without a password. To achieve that you need to follow these steps carefully:
+- create ssh keys on your *LOCAL* machine, not on your VPS
+- add your *PUBLIC* key to .ssh/authorized_keys on your VPS
+- explicitly point to ssh *PRIVATE* key when login from GitHub Actions worker (this step is already done in our ```docker-publish.yml{:bash}```)
+To have a clearer view how it works, I've found useful [this article](http://www.linuxproblem.org/art_9.html).
+
+## Docker compose
+
+We've configured our GitHub Actions workflow so far. Now one thing left - we need to adjust ```docker-compose.yml{:bash}``` from previous article to get rid of source code of our project on VPS:
+
+```diff
+frontend:
+- build: .
++ image: path.to/image/in:registry
+  container_name: frontend
+  env_file:
+    - hosts.env
+```
+
+Instead of building from source code we point to registry (where we've pushed a new image by command ```docker push{:bash}``` during GitHub Actions workflow) for docker to pull the image.
+
+## Wrap Up
+
+That's it! Now, each time when you push your changes to the branch 'main' without *ci skip* in commit message, GitHub Actions workflow will start, build new image from your source code, push it to the registry, then login to your VPS, navigate to the working directory with ```docker-compose.yml{:bash}``` file and redeploy containers.
