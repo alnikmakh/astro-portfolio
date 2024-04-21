@@ -10,4 +10,13 @@ module.exports = {
       },
     },
   },
+  plugins: [
+    ({ addBase }) => {
+      addBase({
+        'ul ul': {
+          listStylePosition: 'inside',
+        },
+      })
+    },
+  ]
 };
