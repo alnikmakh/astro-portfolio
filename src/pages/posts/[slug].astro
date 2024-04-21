@@ -30,7 +30,7 @@ const { Content } = await post.render();
       <p class="text-sm pb-5">{formatDate(post.data.publishedAt)}</p>
       <figure class="flex flex-col items-center">
         <Image src={post.data.image.source} class="w-2/3" alt="alt"/>
-        <figcaption class="text-xs pt-3">{post.data.image.link ? <a href={post.data.image.link}>{post.data.image.description}</a> : ''}</figcaption>
+        <figcaption class="text-xs pt-3">{post.data.image.link ? <a href={post.data.image.link}>{post.data.image.description}</a> : post.data.image.description || ''}</figcaption>
       </figure>
     </header>
 
