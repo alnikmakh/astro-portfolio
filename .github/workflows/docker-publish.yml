@@ -1,7 +1,7 @@
-#
-name: Create and publish a Docker image
 
-# Configures this workflow to run every time a change is pushed to the branch called `release`.
+name: Create, publish and deploy
+
+# Configures this workflow to run every time a change is pushed to the branch called `main`.
 on:
   push:
     branches: ['main']
@@ -20,7 +20,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      #
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
