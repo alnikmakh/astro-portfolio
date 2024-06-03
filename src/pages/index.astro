@@ -9,6 +9,7 @@ import Link from "@/components/shared/Link.astro";
 import { Content as Presentation } from "src/content/about/presentation.mdx";
 
 import presentation from "@/data/presentation";
+import { generatePathFromTitleAndSlug } from "src/utils/generatePathFromTitleAndSlug";
 
 const posts = (await getCollection("posts")).sort(function (first, second) {
   return second.data.publishedAt.getTime() - first.data.publishedAt.getTime();
@@ -56,7 +57,7 @@ const posts = (await getCollection("posts")).sort(function (first, second) {
                   publishedAt={post.data.publishedAt}
                   title={post.data.title}
                   description={post.data.description}
-                  slug={post.slug}
+                  slug={generatePathFromTitleAndSlug(post.data.title, post.slug)}
                 />
               ))
         }

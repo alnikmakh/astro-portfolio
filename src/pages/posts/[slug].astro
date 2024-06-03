@@ -3,12 +3,16 @@ import { CollectionEntry, getCollection } from "astro:content";
 import { Image } from 'astro:assets';
 import Layout from "@/layouts/Layout.astro";
 import formatDate from "@/utils/formatDate";
+import Emphasized from '../../components/shared/emphasized/Emphasized.astro';
+import { generatePathFromTitleAndSlug } from "src/utils/generatePathFromTitleAndSlug";
+
+const components = {em: Emphasized};
 
 export async function getStaticPaths() {
   const posts = await getCollection("posts");
 
   return posts.map((post) => ({
-    params: { slug: post.slug },
+    params: { slug: generatePathFromTitleAndSlug(post.data.title, post.slug) },
     props: { post },
   }));
 }
@@ -34,7 +38,7 @@ const { Content } = await post.render();
       </figure>
     </header>
 
-    <Content />
+    <Content components={components}/>
   </main>
   <div class="giscus" />
 </Layout>
