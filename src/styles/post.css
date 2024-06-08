@@ -7,7 +7,7 @@
 }
 
 .post a {
-  @apply text-neutral-100 underline;
+  @apply text-violet-300 font-bold underline;
 }
 
 .post ul {
@@ -19,5 +19,5 @@
 }
 
 .post pre {
-  @apply p-4 overflow-scroll;
+  @apply p-4 overflow-x-auto;
 }
