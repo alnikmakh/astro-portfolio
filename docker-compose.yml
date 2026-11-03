@@ -30,5 +30,6 @@ services:
   frontend:
     build: .
     container_name: frontend
+    restart: unless-stopped
     env_file:
       - hosts.env

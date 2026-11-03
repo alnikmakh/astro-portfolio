@@ -1,49 +1,94 @@
-
-name: Create, publish and deploy
-
-# Configures this workflow to run every time a change is pushed to the branch called `main`.
+name: Build and deploy portfolio
 on:
   push:
-    branches: ['main']
-
-# Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.actor }}/astro-blog:latest
-
-# There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: portfolio-production
+  cancel-in-progress: false
 jobs:
-  build-and-push-image:
+  validate:
+    name: Validate production build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'ci skip')"
-    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: python3 -m unittest discover -s deployment -p 'test_*.py'
+  publish:
+    name: Publish immutable image
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Log in to the Container registry
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and publish image
+        id: image
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Build and push Docker image
-        run: |
-          docker build . --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          set -euo pipefail
+          export DOCKER_CONFIG="$RUNNER_TEMP/registry-config"
+          install -m 700 -d "$DOCKER_CONFIG"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io --username alnikmakh --password-stdin
+          docker buildx build --push --tag "ghcr.io/alnikmakh/astro-blog:sha-$GITHUB_SHA" --tag ghcr.io/alnikmakh/astro-blog:latest --metadata-file "$RUNNER_TEMP/image-metadata.json" .
+          python3 - <<'PY'
+          import json, os, re
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'image-metadata.json')) as source:
+              digest = json.load(source)['containerimage.digest']
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', digest)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('digest=' + digest + '\n')
+          PY
   deploy:
-    needs: build-and-push-image
-    name: deploy image
+    name: Deploy production
+    needs: publish
+    environment: production
     runs-on: ubuntu-latest
-
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - name: install ssh keys
-        # check this thread to understand why its needed:
-        # <https://stackoverflow.com/a/70447517>
+      - name: Deploy the verified digest
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          IMAGE_DIGEST: ${{ needs.publish.outputs.digest }}
+          GHCR_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          install -m 600 -D /dev/null ~/.ssh/gthb_ctn
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/gthb_ctn
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
-      - name: connect and pull
-        run: ssh -i ~/.ssh/gthb_ctn ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin && cd ${{ secrets.WORK_DIR }} && docker compose pull && docker compose up -d && exit"
-      - name: cleanup
-        run: rm -rf ~/.ssh
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          ssh_dir=$(mktemp -d)
+          trap 'rm -rf "$ssh_dir"' EXIT
+          chmod 700 "$ssh_dir"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          printf '%s\n' "$GHCR_TOKEN" | ssh -F /dev/null -i "$ssh_dir/key" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$ssh_dir/known_hosts" "$SSH_USER@$SSH_HOST" "deploy $IMAGE_DIGEST"
+      - name: Verify public HTTPS endpoints
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 https://regulardev.click/ --output /dev/null
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 https://www.regulardev.click/ --output /dev/null
