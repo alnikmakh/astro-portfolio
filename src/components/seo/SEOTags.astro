@@ -19,7 +19,7 @@ const openGraph = {
   image: og?.image || "/opengraph-image.jpg",
   alt: og?.alt || "alexander makhorin portfolio/blog",
   url: DEFAULT_URL_SITE,
-  description: og?.description || DEFAULT_DESCRIPTION_PAGE,
+  description: og?.description || description || DEFAULT_DESCRIPTION_PAGE,
 };
 ---
 
@@ -34,6 +34,9 @@ const openGraph = {
         title: openGraph.title,
         type: openGraph.type,
         image: openGraph.image,
+      },
+      optional: {
+        description: openGraph.description,
       },
       image: {
         alt: openGraph.alt,
