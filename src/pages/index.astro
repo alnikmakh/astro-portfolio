@@ -1,67 +1,117 @@
 ---
-import { getCollection } from "astro:content";
-import { Image } from "astro:assets"
-
 import Layout from "@/layouts/Layout.astro";
-import SocialLinks from "@/components/SocialLinks.astro";
-import PostCard from "@/components/PostCard.astro";
-import Link from "@/components/shared/Link.astro";
-import { Content as Presentation } from "src/content/about/presentation.mdx";
-
 import presentation from "@/data/presentation";
-import { generatePathFromTitleAndSlug } from "src/utils/generatePathFromTitleAndSlug";
 
-const posts = (await getCollection("posts")).sort(function (first, second) {
-  return second.data.publishedAt.getTime() - first.data.publishedAt.getTime();
-}).filter((item) => item.data.isPublish);
+const businessName = "ALEKSANDR MAKHORIN PR NOVI SAD";
+const title = `${businessName} | Independent Software Developer`;
+const description =
+  "Independent full-stack JavaScript and TypeScript developer based in Novi Sad, Serbia. Web applications, APIs, integrations and ongoing software maintenance.";
+
+const services = [
+  {
+    title: "Web applications",
+    description:
+      "Frontend and backend development with JavaScript and TypeScript, from individual features to complete web applications.",
+  },
+  {
+    title: "Backend & integrations",
+    description:
+      "Backend services, APIs and integrations that connect applications, databases and third-party services.",
+  },
+  {
+    title: "Development & maintenance",
+    description:
+      "Ongoing software development, bug fixes, refactoring and maintenance of existing applications.",
+  },
+];
 ---
 
-<Layout>
-  <main class="flex flex-col gap-20">
-    <article
-      class="flex flex-col gap-8 md:flex-row-reverse md:justify-end md:gap-12"
-    >
-      {
-        presentation.profile && (
-          <Image
-            src={presentation.profile}
-            class="w-1/4 self-center rounded-full"
-            alt="Your Profile"
-            width="200"
-            height="200"
-          />
-        )
-      }
-
-      <div class="flex flex-col gap-8">
-        <Presentation />
-
-        <SocialLinks />
+<Layout
+  title={title}
+  description={description}
+  og={{
+    title,
+    description,
+    type: "website",
+    image: "/opengraph-image.jpg",
+    alt: "Aleksandr Makhorin — independent software developer in Serbia",
+  }}
+>
+  <main class="flex flex-col gap-14 md:gap-20">
+    <section aria-labelledby="business-name" class="grid gap-10 md:grid-cols-3 md:gap-12">
+      <div class="flex flex-col gap-6 md:col-span-2">
+        <p class="text-sm font-medium uppercase tracking-widest text-orange-500">
+          Independent software development · Serbia
+        </p>
+        <h1 id="business-name" class="text-3xl font-semibold leading-tight tracking-tight text-neutral-100 md:text-4xl">
+          {businessName}
+        </h1>
+        <p class="text-xl leading-relaxed text-neutral-100 md:text-2xl">
+          Full-stack JavaScript &amp; TypeScript developer
+        </p>
+        <p class="leading-relaxed">
+          I am Aleksandr Makhorin, an independent software developer based in
+          Novi Sad, Serbia. I provide frontend and backend development services
+          to businesses as an independent contractor.
+        </p>
+        <p class="leading-relaxed">
+          My work covers web applications, APIs and integrations, as well as
+          ongoing development and maintenance of existing software.
+        </p>
+        <a
+          href={`mailto:${presentation.mail}`}
+          class="w-fit rounded-lg bg-orange-500 px-5 py-3 text-base font-semibold text-neutral-950 transition-colors hover:bg-orange-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-400"
+        >
+          Contact for project enquiries
+        </a>
       </div>
-    </article>
 
-    <article class="flex flex-col gap-8">
-      <header class="flex w-full flex-row justify-between gap-2">
-        <h3 class="text-lg text-neutral-100">Latest posts</h3>
-        {posts.length !== 0 && <Link href="/posts" label="See all posts" isUnderline target="_self" />}
-      </header>
-      {posts.length === 0 && <p>Soon, stay connected 👀...</p>}
+      <aside aria-labelledby="business-details" class="h-fit rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
+        <h2 id="business-details" class="!mt-0 !text-lg font-medium">Business details</h2>
+        <dl class="mt-6 flex flex-col gap-6 text-base">
+          <div>
+            <dt class="text-sm text-neutral-400">Business type</dt>
+            <dd class="mt-1 text-neutral-100">Sole proprietor (preduzetnik)</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-neutral-400">Location</dt>
+            <dd class="mt-1 text-neutral-100">Novi Sad, Serbia</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-neutral-400">Registration number / Matični broj</dt>
+            <dd class="mt-1 font-mono tabular-nums text-neutral-100">67261089</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-neutral-400">Tax ID / PIB</dt>
+            <dd class="mt-1 font-mono tabular-nums text-neutral-100">114016521</dd>
+          </div>
+        </dl>
+      </aside>
+    </section>
 
-      <section class="flex flex-col gap-4 md:flex-row md:flex-wrap">
-        {
-          posts.length !== 0 &&
-            posts
-              .slice(0, 2)
-              .map((post) => (
-                <PostCard
-                  publishedAt={post.data.publishedAt}
-                  title={post.data.title}
-                  description={post.data.description}
-                  slug={generatePathFromTitleAndSlug(post.data.title, post.slug)}
-                />
-              ))
-        }
-      </section>
-    </article>
+    <section aria-labelledby="services-heading" class="flex flex-col gap-6">
+      <h2 id="services-heading" class="!mt-0 !text-2xl font-medium">Software development services</h2>
+      <div class="grid gap-4 md:grid-cols-3">
+        {services.map((service) => (
+          <article class="rounded-xl border border-neutral-800 p-6">
+            <h3 class="!mt-0 !text-lg font-medium">{service.title}</h3>
+            <p class="mt-3 text-base leading-relaxed text-neutral-400">{service.description}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    <section aria-labelledby="contact-heading" class="border-t border-neutral-800 pt-8">
+      <h2 id="contact-heading" class="!mt-0 !text-2xl font-medium">Business enquiries</h2>
+      <p class="mt-3 text-base leading-relaxed text-neutral-400">
+        For project enquiries and contract cooperation, please get in touch by email.
+      </p>
+      <a
+        href={`mailto:${presentation.mail}`}
+        class="mt-3 inline-block break-all text-orange-500 underline decoration-orange-500/40 underline-offset-4 hover:text-orange-400"
+      >
+        {presentation.mail}
+      </a>
+    </section>
   </main>
 </Layout>
