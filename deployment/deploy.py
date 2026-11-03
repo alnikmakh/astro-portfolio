@@ -38,7 +38,7 @@ def main():
     if ROOT.stat().st_uid != 0 or ROOT.stat().st_mode & 0o022:
         sys.exit("Deployment directory must be owned and writable only by root")
     os.umask(0o077)
-    with open("/run/lock/astro-portfolio-deploy.lock", "w") as lock:
+    with open(ROOT / "deploy.lock", "w") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
